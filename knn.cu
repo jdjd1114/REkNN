@@ -1,0 +1,244 @@
+#include <mat.h>
+#include <stdio.h>
+#include <time.h>
+#include <sys/time.h>
+#include <math.h>
+#include <iostream>
+#include "cokus.cpp"
+#include<cuda_runtime.h>
+using namespace std;
+
+#define TILE_SIZE=64
+
+bool InitCUDA(){
+	int count;
+	cudaGetDeviceCount(&count);
+	if(count==0){
+		fprintf(stderr,"There is no device.\n");
+		return;
+	}
+	int i;
+	for (i =0; i<count,i++){
+		cudaDeviceProp prop;
+		if(cudaGetDeviceProperties(&prop,i)==cudaSuccess){
+			if(prop.major>=1){
+				break;
+			}
+		}
+	}
+
+	if(i==count){
+		fprintf(stderr,"There is no device supporting CUDA 1.x.\n");
+		return false;
+	}
+
+	cudaSetDevice(i);
+	return true;
+}
+
+//寻找最大值，并返回索引位置
+int max(int array[],int n){
+	int m=array[0];
+	int index=0;
+	for(int i=1;i<n;i++){
+		if(m<array[i]){
+			m=array[i];
+			index=i;
+		}
+	}
+	return index;
+}
+
+/*插入排序*/  
+int * InsertSort(double array[],int n)  
+{  
+	//初始化index数组
+	int * index = new int[n];
+	for(int i=0;i<n;i++)
+		index[i]=i;
+
+	for(int i=1;i<n;i++){  
+       		for(int j=i;j>0;j--)  
+        	{	  
+           		if(array[j]<array[j-1]){  
+                		swap(array[j],array[j-1]);  
+				swap(index[j],index[j-1]);
+			}
+            		else  
+                		break;  
+        	}  
+    	}  
+	return index;
+} 	
+
+//计算距离函数
+void calculate_distance(double ** tr,int tr_size,double ** te,int te_size,double ** distance,int n){
+	for (int i=0;i<te_size;i++){
+		for(int j=0;j<tr_size;j++){
+			for (int x=0;x<n;x++){
+				distance[i][j]+=(te[i][x]-tr[j][x])*(te[i][x]-tr[j][x]);
+			}
+			distance[i][j]=sqrt(distance[i][j]);
+		}
+	}
+}
+
+//knn		
+int * knn(double ** train,int m,int n,double ** test,int a,int b,int k,int nclass){
+	//初始化predict_label
+	int * predict_label = new int [a];
+	for(int i=0;i<a;i++){
+		predict_label[i]=0;
+	}
+	
+	//distance数组用于存放特征点之间的距离,初始化distance
+	double ** distance=new double *[a];
+	for(int i=0;i<a;i++){
+		distance[i]=new double [m];
+	}
+	for(int i=0;i<a;i++)
+		for(int j=0;j<m;j++)
+			distance[i][j]=0;
+	
+	//index数组用于存放特征点的索引位置
+	int ** index=new int *[a];
+	for(int i=0;i<a;i++){
+		index[i]=new int [m];
+	}
+	for(int i=0;i<a;i++)
+		for(int j=0;j<m;j++)
+			index[i][j]=0;
+	
+	//labels数组存放训练集中特征点对应的标签
+	int ** labels=new int *[a];
+	for(int i=0;i<a;i++){
+		labels[i]=new int [m];
+	}
+	for(int i=0;i<a;i++)
+		for(int j=0;j<m;j++)
+			labels[i][j]=0;
+	
+	//计算距离
+	calculate_distance(train,m,test,a,distance,n-1);
+	/*for(int i=0;i<a;i++){
+		for(int j=0;j<m;j++){
+			for(int x=0;x<b;x++){
+				distance[i][j]+=(test[i][x]-train[j][x])*(test[i][x]-train[j][x]);
+			}
+			distance[i][j]=sqrt(distance[i][j]);
+		
+		}
+		//fprintf(stdout,"%lf %lf %lf %lf\n",distance[i][0],distance[i][1],distance[i][2],distance[i][3]);
+	}*/
+	//距离排序
+	for(int i=0;i<a;i++){
+		index[i]=InsertSort(distance[i],m);
+		for(int j=0;j<m;j++){
+			labels[i][j]=train[index[i][j]][n-1];
+		}
+		//fprintf(stdout,"%d %d,%d %d\n",index[i][0],labels[i][0],index[i][1],labels[i][1]);
+	}
+	
+	int *count=new int[nclass];
+	
+	//生成预测label
+	for(int i=0;i<a;i++){
+		for(int x=0;x<nclass;x++)
+			count[x]=0;
+		for(int y=0;y<nclass;y++){
+			for(int j=0;j<k;j++){
+				if(labels[i][j]==(y+1))
+					count[y]++;
+			}
+		}
+		int idx=max(count,nclass);
+		predict_label[i]=idx+1;
+	}
+	
+	return predict_label;
+}
+ 
+  		
+int main(int argc, char * argv[])
+{
+	clock_t start,end;
+	int k,a,b,m,n,nclass;
+	double *trainset,*testset;
+	if(argc!=4){
+		fprintf(stderr, "4 input arguments required!");
+	}
+	MATFile * datamat = matOpen(argv[1], "r");
+	mxArray * train = matGetVariable(datamat,"trainset");
+	mxArray * test = matGetVariable(datamat,"testset");
+
+	//MATFile * testmat = matOpen(argv[2], "r");
+	//mxArray * test = matGetVariable(testmat,"DS");
+	
+	trainset = (double*)mxGetData(train);
+	testset = (double*)mxGetData(test);
+	
+	//get the number of rows and columns of trainset
+	m=mxGetM(train);
+	n=mxGetN(train);
+	
+	//Matrix train_set
+	double ** train_set=new double *[m];
+	for(int i=0;i<m;i++){
+		train_set[i]=new double[n];
+	}
+	for(int i=0;i<m;i++){
+		for(int j=0;j<n;j++){
+			train_set[i][j]=trainset[j*m+i];
+		}
+	}
+	//trainset = (double **)mxGetData(train);
+	fprintf(stdout,"number of rows of trainset:%d\n",m);
+	fprintf(stdout,"number of columns of trainset:%d\n",n);
+	//fprintf(stdout,"Value of train_set[0][4] is:%lf\n",train_set[0][4]);
+
+	//get the number of rows and columns of testset 
+	a=mxGetM(test);
+	b=mxGetN(test);
+
+	//Matrix test_set
+	double ** test_set = new double * [a];
+	for (int i=0;i<a;i++){
+		test_set[i]=new double [b];
+	}
+	for (int i=0;i<a;i++){
+		for (int j=0;j<b;j++){
+			test_set[i][j] = testset[j*a+i];
+		}
+	}
+	fprintf(stdout,"Number of rows of testset:%d\n",a);
+	fprintf(stdout,"Number of columns of testset:%d\n",b);
+	//fprintf(stdout,"Value of test_set[0][3] is:%lf\n",test_set[0][3]);
+	if(b==n){
+		fprintf(stderr, "Number of testset's columns should be equal to number of trainset's column!");
+	}
+	
+	//Get the value of k
+	k = (int)atoi(argv[2]);
+	if(k<=0)
+		fprintf(stderr, "Value of k must be greater than zero!");
+	
+	//Get the number of classes
+	nclass = (int)atoi(argv[3]);
+	
+	//chushihua predict_label
+	int * predict_label = new int [a];
+	for(int i=0;i<a;i++){
+		predict_label[i]=0;
+	}
+	fprintf(stdout,"Initialation finished!!!\n");
+	start=clock();
+	predict_label = knn(train_set,m,n,test_set,a,b,k,nclass);
+	end=clock();
+	double usetime=(double)(end-start);
+	fprintf(stdout,"Predicting labels for testset has finished!\n");
+	fprintf(stdout,"Using time of knnclassfier is:%lf(s)\n",usetime/CLOCKS_PER_SEC);
+	//for (int i=0;i<a;i++){
+	//	fprintf(stdout,"predict label for testset[%d] is %d\n",i,predict_label[i]);
+	//}	
+	return 0;
+}
