@@ -199,7 +199,7 @@ int main(int argc, char * argv[])
 
 	fprintf(stdout,"\nTesting Set\n");
 	fprintf(stdout," row : %d    col : %d\n", a, b);
-    cout << "=========================================\n";
+    cout << "==========================================\n";
 	if(b!=n && b!=(n-1)){
 		fprintf(stderr, "Number of testset's columns should be equal to number of trainset's column!\n");
 	}
