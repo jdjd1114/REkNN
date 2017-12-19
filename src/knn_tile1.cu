@@ -429,7 +429,7 @@ int main(int argc, char * argv[])
 	m=mxGetM(train);
 	n=mxGetN(train);
 
-    cout << "============================================\n";    
+    cout << "==========================================\n";    
 	fprintf(stdout,"Training set\n row : %d    ",m);
 	fprintf(stdout,"col : %d\n",n);
 
@@ -439,7 +439,7 @@ int main(int argc, char * argv[])
 
 	fprintf(stdout,"\nTesting set\n row : %d    ",a);
 	fprintf(stdout,"col : %d\n",b);
-	cout <<"============================================\n";
+	cout <<"===========================================\n";
     
     if ( b != n && b != (n - 1) ) {
 		fprintf(stderr, "Number of testset's columns should be equal to number of trainset's column!");
