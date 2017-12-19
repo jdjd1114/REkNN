@@ -244,7 +244,6 @@ int * knn(double * train,int m,int n,double * test,int a,int b,int k,int nclass)
 	int gridSize = 64;
 	int blockSize = 512;
 	//int threadNum = gridSize * blockSize;
-	//fprintf(stdout,"Step 1 finished!\n");
 
 	fprintf(stdout,"Start calculating distance matrix...\n");
 	start = clock();	
@@ -268,15 +267,8 @@ int * knn(double * train,int m,int n,double * test,int a,int b,int k,int nclass)
 	else{
 		index_size=m;
 	}
-	//fprintf(stdout,"index size is : %d \n",index_size);
-	/*int ** index =new int * [a];
-	for (int i=0;i<a;i++){
-		index[i] = new int [k];
-		for (int j=0;j<k;j++){
-			index[i][j]=0;
-		}
-	}*/
-	double ** matr_distance = new double * [a];
+	
+    double ** matr_distance = new double * [a];
 	for (int i=0;i<a;i++){
 		matr_distance[i] = new double [index_size];
 	}
@@ -325,10 +317,8 @@ int * knn(double * train,int m,int n,double * test,int a,int b,int k,int nclass)
 		SAFE_CALL(cudaMemcpyAsync(distance+(i_1 + k)*a, gpu_distance1, a * k * sizeof(double), cudaMemcpyDeviceToHost, stream1));
 		SAFE_CALL(cudaMemcpyAsync(index+(i_1 + k) * a, gpu_index1, a * k * sizeof(double), cudaMemcpyDeviceToHost, stream1));
 			
-		//fprintf(stdout,"The %dth iteration.\n",i_0/TILE_SIZE);
 		i_1 += 2*k;
 	}
-	//fprintf(stdout,"i_0:%d\n",i_0);
 	if (m%(2*TILE_SIZE)>TILE_SIZE){
 		//将训练集(已转置)分片调入显存
 		SAFE_CALL(cudaMemcpyAsync(gpu_train0, trainset + i_0*n, TILE_SIZE * n * sizeof(double),cudaMemcpyHostToDevice,stream0));
@@ -406,12 +396,8 @@ int * knn(double * train,int m,int n,double * test,int a,int b,int k,int nclass)
 	
 	end = clock();
 	fprintf(stdout,"Time costed to calculate distance matrix: %f s\n",float(end-start)/CLOCKS_PER_SEC);
-	/*
-	for (int i=0;i<10;i++){
-		fprintf(stdout,"Sorted distances: %lf %lf,%lf %lf,%lf %lf\n", distance[i], distance[i + 1*a],distance[i+k*a],distance[i+(k+1)*a],distance[i+2*k*a],distance[i+(2*k+1)*a],distance[i+(index_size-2)*a],distance[i+(index_size-1)*a]);
-		fprintf(stdout,"Sorted index: %d %d,%d %d,%d %d,%d %d\n",int(index[i]), int(index[i + 1*a]), int(index[i+k*a]), int(index[i+(k+1)*a]), int(index[i+2*k*a]), int(index[i+(2*k+1)*a]), int(index[i+(index_size-2)*a]), int(index[i+(index_size-1)*a]));
-	}*/
-	start = clock();
+	
+    start = clock();
 	global_knn(train,distance,index,labels,predict_label,a,m,n,k,nclass);
 	end = clock();
 	fprintf(stdout,"Time costed to sort distances : %lf s\n",double(end-start)/CLOCKS_PER_SEC);
@@ -435,9 +421,6 @@ int main(int argc, char * argv[])
 	MATFile * datamat = matOpen(argv[1], "r");
 	mxArray * train = matGetVariable(datamat,"trainset");
 	mxArray * test = matGetVariable(datamat,"testset");
-
-	//MATFile * testmat = matOpen(argv[2], "r");
-	//mxArray * test = matGetVariable(testmat,"DS");
 	
 	trainset = (double*)mxGetData(train);
 	testset = (double*)mxGetData(test);
@@ -445,19 +428,20 @@ int main(int argc, char * argv[])
 	//get the number of rows and columns of trainset
 	m=mxGetM(train);
 	n=mxGetN(train);
-	
-	fprintf(stdout,"Training set\n row:%d    ",m);
-	fprintf(stdout,"cloumn:%d\n",n);
-	//fprintf(stdout,"Value of train_set[0][4] is:%lf\n",train_set[0][4]);
+
+    cout << "============================================\n";    
+	fprintf(stdout,"Training set\n row : %d    ",m);
+	fprintf(stdout,"col : %d\n",n);
 
 	//get the number of rows and columns of testset 
 	a=mxGetM(test);
 	b=mxGetN(test);
 
-	fprintf(stdout,"Testing set\n row:%d    ",a);
-	fprintf(stdout,"column:%d\n",b);
-	//fprintf(stdout,"Value of test_set[0][3] is:%lf\n",test_set[0][3]);
-	if(b!=n && b!=(n-1)){
+	fprintf(stdout,"\nTesting set\n row : %d    ",a);
+	fprintf(stdout,"col : %d\n",b);
+	cout <<"============================================\n";
+    
+    if ( b != n && b != (n - 1) ) {
 		fprintf(stderr, "Number of testset's columns should be equal to number of trainset's column!");
 	}
 	
@@ -474,22 +458,13 @@ int main(int argc, char * argv[])
 	for(int i=0;i<a;i++){
 		predict_label[i]=0;
 	}
-	//fprintf(stdout,"Initialation finished!!!\n");
-	start=clock();
+	
+    start=clock();
 	predict_label = knn(trainset,m,n,testset,a,b,k,nclass);
 	end=clock();
 	double usetime=(double)(end-start);
-	//fprintf(stdout,"Predicting labels for testset has finished!\n");
 	fprintf(stdout,"Processing time of knnclassifier is:%lf s\n",usetime/CLOCKS_PER_SEC);
-	int out=a;
-	if(a>10)
-		out=10;
-	for (int i=0;i<out;i++){
-		if(i%2 == 0)
-			fprintf(stdout,"predict label for testset[%d] is %d.   ",i,predict_label[i]);
-		if(i%2 != 0)
-			fprintf(stdout,"predict label for testset[%d] is %d.\n",i,predict_label[i]);
-	}
+	
 	float accuracy=0.0;
         int right = 0;
 	if (b==n){
