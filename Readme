@@ -1,0 +1,16 @@
+######################################
+KNN Classifier
+#####################################
+
+Step 1.
+> git clone 
+
+Step 2.
+> make all
+
+Step 3.
+Run knn classifier on GPU --> EXE DATASET K Class_Num
+> ./bin/Gknn data/minist.mat 10 10
+
+Run knn classifier on CPU --> EXE DATASET K Class_Num
+> ./bin/Cknn data/minist.mat 10 10
