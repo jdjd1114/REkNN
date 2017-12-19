@@ -178,10 +178,9 @@ int main(int argc, char * argv[])
 			train_set[i][j]=trainset[j*m+i];
 		}
 	}
-	//trainset = (double **)mxGetData(train);
-	fprintf(stdout,"number of rows of trainset:%d\n",m);
-	fprintf(stdout,"number of columns of trainset:%d\n",n);
-	//fprintf(stdout,"Value of train_set[0][4] is:%lf\n",train_set[0][4]);
+    cout << "==========================================\n";
+	fprintf(stdout, "Training Set\n");
+    fprintf(stdout, " row : %d    col : %d\n", m, n);
 
 	//get the number of rows and columns of testset
 	a=mxGetM(test);
@@ -197,9 +196,10 @@ int main(int argc, char * argv[])
 			test_set[i][j] = testset[j*a+i];
 		}
 	}
-	fprintf(stdout,"Number of rows of testset:%d\n",a);
-	fprintf(stdout,"Number of columns of testset:%d\n",b);
-	//fprintf(stdout,"Value of test_set[0][3] is:%lf\n",test_set[0][3]);
+
+	fprintf(stdout,"\nTesting Set\n");
+	fprintf(stdout," row : %d    col : %d\n", a, b);
+    cout << "=========================================\n";
 	if(b!=n && b!=(n-1)){
 		fprintf(stderr, "Number of testset's columns should be equal to number of trainset's column!\n");
 	}
@@ -213,21 +213,15 @@ int main(int argc, char * argv[])
 	nclass = (int)atoi(argv[3]);
 
 	//chushihua predict_label
-	int * predict_label = new int [a];
-	for(int i=0;i<a;i++){
-		predict_label[i]=0;
-	}
-	fprintf(stdout,"Initialation finished!!!\n");
+	int * predict_label = new int [a]();
+
 	start=clock();
 	predict_label = knn(train_set,m,n,test_set,a,b,k,nclass);
 	end=clock();
 	double usetime=(double)(end-start);
-	fprintf(stdout,"Predicting labels for testset has finished!\n");
-	fprintf(stdout,"Using time of knnclassfier is:%lf(s)\n",usetime/CLOCKS_PER_SEC);
-	/*for (int i=0;i<20;i++){
-		fprintf(stdout,"predict label for testset[%d] is %d\n",i,predict_label[i]);
-	}*/
-	float accuracy = 0.0;
+	fprintf(stdout,"Done. Using time of knnclassfier is : %.3lf(s)\n", usetime/CLOCKS_PER_SEC);
+	
+    float accuracy = 0.0;
 	int right = 0;
 	if(b == n){
 		for (int i=0;i<a;i++){
